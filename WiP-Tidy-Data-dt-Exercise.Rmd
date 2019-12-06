@@ -103,17 +103,106 @@ Based on our findings above, we can "skip" the first four lines and treat the
 fifth line as column (variable) names. Also note the use of the `check.names`
 argument to ensure that the column names are compliant in R.
 
-```{r readData, collapse=TRUE}
+```{r readData, echo=FALSE, message=FALSE, warning=FALSE, collapse=TRUE}
 library(data.table)
 library(here)
+library(magrittr)
+library(knitr)
+library(kableExtra)
 wip <- fread(here("data", "WB-WiP.csv"), 
              skip = 4, header = TRUE,
              check.names = TRUE)
+
+wip[, c("Indicator.Name", "Indicator.Code", "V65"):=NULL]
+
+setnames(wip, c("Country.Name", "Country.Code"), c("Country", "Code"))
+
+WP <- melt(wip,
+           id.vars = c("Country", "Code"),
+           measure = patterns("^X"),
+           variable.name = "YearC",
+           value.name = c("pctWiP"),
+           na.rm = TRUE)
+
+WP[, `:=`(pctMiP = 100-pctWiP,
+          Ratio = (100-pctWiP)/pctWiP)]
+
+# Create a Numeric Year column
+WP[, Year := as.numeric(gsub("^X", "", YearC))][, YearC:=NULL]
+
+# Order data by Country and Year
+setcolorder(WP, c("Country", "Code", "Year", "pctWiP", "Ratio"))
+
+# Pretty table
+WP %>%
+  head(., n=7) %>%
+  kable(align="lcrrrr", digits = c(0, 0, 1, 1, 1, 1)) %>%
+  kable_styling(bootstrap_options = "striped", font_size = 14)
+
+# EU Data
+WPEU <- WP[Country %in% c("Portugal", "France", "Italy", "Spain", "Belgium") & (Year %% 5) == 0, .(Country, Year, pctWiP)]
 ```
 
-# Continue from here...
 
+# Data for some EU countries
 
+Percentage of women in Parliament. Based on Data from Portugal, France, Italy, Spain and Belgium (1990 - 2015).
+
+```{r EUData, echo=FALSE, message=FALSE, warning=FALSE, collapse=TRUE}
+# To better visualize, use wide table
+EUWide <- dcast(WPEU, Year ~ Country)
+
+# Pretty table
+EUWide %>%
+  kable(align="rrrrrr", digits = c(0, 1, 1, 1, 1, 1)) %>%
+  kable_styling(bootstrap_options = "striped", font_size = 14) %>%
+  column_spec(1:6, width="4em")
+```
+
+# Portugal vs EU Countries
+
+Percentage of women in Parliament in the EU (1990 - 2015).
+
+```{r PTData, echo=FALSE, message=FALSE, warning=FALSE, collapse=TRUE}
+library(ggplot2)
+WP[Country %in% c("Portugal", "Sweden", "Spain", "Hungary", "Romania", "Finland", "Germany", "European Union")] %>%
+  ggplot(aes(Year, pctWiP, colour=Country))+
+  geom_line()+
+  geom_point()+
+  scale_x_continuous(breaks=seq(1990, 2020, 5)) +
+  scale_y_continuous(limits=c(0, 50),
+                     breaks=seq(0, 50, by=10)) +
+  ggtitle("Women in Parliament: EU Countries") +
+  ylab("% Women in Parliament")
+```
+
+# 
+
+```{r cl, echo=FALSE, message=FALSE, warning=FALSE, collapse=TRUE}
+library(countrycode)
+cl <- as.data.table(codelist)[, .(continent, wb)]
+cWP <- merge(WP, cl, by.x ="Code", by.y ="wb")
+setnames(cWP, c("continent"), c("Continent"))
+setcolorder(cWP, c("Continent", "Country", "Code", "Year", "pctWiP", "pctMiP", "Ratio"))
+setkey(cWP, Continent, Country, Year)
+
+ptWP <- cWP[Country %in% c("Portugal")]
+
+cWP[Continent %in% c("Europe")] %>%
+  ggplot(aes(Year, pctWiP)) +
+  geom_line(data=ptWP, colour="blue") +
+  geom_point(data=ptWP, colour="blue") +
+  geom_line() +
+  geom_point() +
+  scale_x_continuous(breaks=seq(1990, 2020, 5)) +
+  scale_y_continuous(limits=c(0, 50),
+                     breaks=seq(0, 50, by=10)) +
+  ggtitle("Women in Parliament: EU Countries") +
+  ylab("% Women in Parliament") +
+  theme(legend.position = "bottom")
+  
+
+```
 
 
 
