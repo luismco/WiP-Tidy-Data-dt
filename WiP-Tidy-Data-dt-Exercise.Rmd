@@ -189,11 +189,11 @@ setkey(cWP, Continent, Country, Year)
 ptWP <- cWP[Country %in% c("Portugal")]
 
 cWP[Continent %in% c("Europe")] %>%
-  ggplot(aes(Year, pctWiP)) +
+  ggplot(aes(Year, pctWiP, group = Country)) +
+  geom_line(colour = "grey")+
+  geom_point(colour = "grey") +
   geom_line(data=ptWP, colour="blue") +
   geom_point(data=ptWP, colour="blue") +
-  geom_line() +
-  geom_point() +
   scale_x_continuous(breaks=seq(1990, 2020, 5)) +
   scale_y_continuous(limits=c(0, 50),
                      breaks=seq(0, 50, by=10)) +
